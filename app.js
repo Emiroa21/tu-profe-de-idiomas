@@ -269,6 +269,7 @@ function questionEl(q, opts = {}){
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2600); }
 
 /* ---------- vistas ---------- */
+const SHORT = {inicio:'Inicio', plan:'Plan', lecciones:'Lecciones', examenes:'Exámenes', vocabulario:'Vocab.', estadisticas:'Progreso', configuracion:'Ajustes'};
 const VIEWS = [['inicio','Inicio','home'],['plan','Plan de estudio','plan'],['lecciones','Lecciones','book'],['examenes','Exámenes','exam'],['vocabulario','Vocabulario','vocab'],['estadisticas','Estadísticas','stats'],['configuracion','Configuración','gear']];
 let ui = {lesson:null, exam:null, onb:{step:0}, flash:null, confirmReset:false};
 const route = () => { const h = location.hash.slice(1); return VIEWS.some(v => v[0] === h) ? h : 'inicio'; };
@@ -278,7 +279,7 @@ function renderSide(){
   const c = C(), r = route();
   const out = sb && session ? `${ic('logout', 18)} Cerrar sesión` : '';
   $('#side').innerHTML = `<div class="side-top"><div class="brand">${MARK(34)}Tu profe</div>${out ? `<button class="logout logout-m" data-logout>${out}</button>` : ''}</div>
-    <nav class="nav">${VIEWS.map(([id, label, icon]) => `<a href="#${id}" class="${r === id ? 'on' : ''}">${ic(icon)}<span>${label}</span></a>`).join('')}</nav>
+    <nav class="nav" aria-label="Secciones">${VIEWS.map(([id, label, icon]) => `<a href="#${id}" class="${r === id ? 'on' : ''}" ${r === id ? 'aria-current="page"' : ''}>${ic(icon)}<span class="nl">${label}</span><span class="ns">${SHORT[id]}</span></a>`).join('')}</nav>
     <div class="levelbox"><small>Tu nivel</small><b>${LANGS[c.lang].name} - ${c.level}</b><div class="bar"><i style="width:${levelPct(c)}%"></i></div>
     <small>${c.level === 'C2' ? levelPct(c) + '% de maestría C2' : levelPct(c) + '% para llegar a ' + nextLevel(c.level)}</small></div>
     ${out ? `<button class="logout" data-logout>${out}</button>` : ''}`;
