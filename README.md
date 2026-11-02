@@ -10,7 +10,7 @@ Es una página estática (HTML, CSS y JavaScript sin compilación). El login y l
 |---|---|
 | `index.html` | Estructura de la página |
 | `styles.css` | Estilos (modo claro y oscuro) |
-| `content.js` | Temario, 24 lecciones de inglés (A1–C2), prueba de nivel y banco Cambridge |
+| `content.js` | Temario, 60 lecciones de inglés (A1–C2), con lectura y escucha, prueba de nivel y banco Cambridge |
 | `app.js` | Lógica: login, onboarding, lecciones, exámenes, progreso, guardado |
 | `config.js` | URL y anon key de Supabase |
 | `supabase/schema.sql` | Tabla `progress` con sus reglas de seguridad |

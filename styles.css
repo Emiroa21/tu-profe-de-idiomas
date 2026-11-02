@@ -230,3 +230,18 @@ th{color:var(--muted);font-weight:600;border-top:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .logo-mark{flex:none;display:block}
+/* audio y pronunciación */
+.say{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--accent);display:inline-grid;place-items:center;flex:none;padding:0;vertical-align:middle;margin-right:6px}
+.say:hover{background:var(--accent-soft)}
+.sayrow{display:flex;align-items:center;gap:4px}
+.vchips span{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap}
+.vchips .say{width:26px;height:26px}
+.mic{width:38px;height:38px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
+.mic.rec{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 8px var(--accent-soft)}}
+.speak-res{display:block;margin-top:4px;font-weight:600}
+.speak-res.ok{color:var(--good)} .speak-res.mid{color:var(--accent)} .speak-res.no{color:var(--bad)}
+.speak-row .t small{display:block}
+.reading{display:flex;flex-direction:column;gap:12px;font-size:16.5px;line-height:1.65;background:var(--sunk);border-radius:12px;padding:18px 20px}
+.player{background:var(--sunk);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.transcript{display:flex;flex-direction:column;gap:8px;border-left:3px solid var(--line);padding-left:14px}

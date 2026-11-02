@@ -30,6 +30,10 @@ const P = {
   spark:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>',
   mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
   logout:'<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/>',
+  sound:'<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  play:'<path d="M7 5v14l11-7z" fill="currentColor"/>',
+  stop:'<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
   trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>'
 };
 const ic = (n, s=20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]||P.book}</svg>`;
@@ -114,11 +118,12 @@ function getLesson(c, lv, i){
 }
 const nextLevel = lv => LEVELS[Math.min(LEVELS.indexOf(lv)+1, 5)];
 const lvIdx = lv => LEVELS.indexOf(lv);
-function doneInLevel(c, lv = c.level){ return [0,1,2,3].filter(i => c.completed[lid(c.lang, lv, i)]).length; }
+const nLessons = (c, lv = c.level) => topics(c.lang)[lv].length;
+function doneInLevel(c, lv = c.level){ return topics(c.lang)[lv].filter((_, i) => c.completed[lid(c.lang, lv, i)]).length; }
 function bestExam(c, lv = c.level){ return c.exams.filter(e => e.level === lv).reduce((m, e) => Math.max(m, e.score / e.total), 0); }
-function levelPct(c){ return Math.round(doneInLevel(c) / 4 * 60 + bestExam(c) * 40); }
-function canLevelUp(c){ return c.level !== 'C2' && doneInLevel(c) === 4 && bestExam(c) >= 0.7; }
-function todayIdx(c){ for (let i=0;i<4;i++) if (!c.completed[lid(c.lang, c.level, i)]) return i; return -1; }
+function levelPct(c){ return Math.round(doneInLevel(c) / nLessons(c) * 60 + bestExam(c) * 40); }
+function canLevelUp(c){ return c.level !== 'C2' && doneInLevel(c) === nLessons(c) && bestExam(c) >= 0.7; }
+function todayIdx(c){ for (let i=0;i<nLessons(c);i++) if (!c.completed[lid(c.lang, c.level, i)]) return i; return -1; }
 function goalOf(c){ return GOALS.find(g => g.id === c.goal) || GOALS[6]; }
 function targetOf(level, goalId){
   const g = GOALS.find(x => x.id === goalId) || GOALS[6];
@@ -152,11 +157,11 @@ function recordAnswer(ok){ state.answered++; if (ok) state.correct++; logActivit
 
 /* banco de preguntas para práctica y exámenes */
 function camToQ(x){ return x.part === 1 ? {type:'mc', s:x.s, o:x.o, a:x.a, e:x.e, part:1} : {type:'fill', s:x.s, ans:x.ans, e:x.e, stem:x.stem, first:x.first, key:x.key, part:x.part}; }
-function lessonQs(L){ return (L.questions || []).map(q => Object.assign({type: q.type === 'fill' ? 'fill' : 'mc', from: L.title}, q)); }
+function lessonQs(L, withCtx){ return (L.questions || []).filter(q => withCtx || !q.ctx).map(q => Object.assign({type: q.type === 'fill' ? 'fill' : 'mc', from: L.title}, q)); }
 function practicePool(c){
   const cur = [], prev = [];
   LEVELS.slice(0, lvIdx(c.level)+1).forEach(lv => {
-    for (let i=0;i<4;i++){ const L = getLesson(c, lv, i); if (L) (lv === c.level ? cur : prev).push(...lessonQs(L)); }
+    for (let i=0;i<nLessons(c, lv);i++){ const L = getLesson(c, lv, i); if (L) (lv === c.level ? cur : prev).push(...lessonQs(L)); }
   });
   (c.extra || []).forEach(id => { const g = c.generated[id]; if (g) cur.push(...lessonQs(g)); });
   if (c.lang === 'en' && lvIdx(c.level) >= 3) CAMBRIDGE.filter(x => lvIdx(x.lv) <= lvIdx(c.level)).forEach(x => cur.push(camToQ(x)));
@@ -166,7 +171,7 @@ function weeklyPool(c){
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate()-7);
   const recent = [], rest = [];
   LEVELS.slice(Math.max(0, lvIdx(c.level)-1), lvIdx(c.level)+1).forEach(lv => {
-    for (let i=0;i<4;i++){
+    for (let i=0;i<nLessons(c, lv);i++){
       const L = getLesson(c, lv, i); if (!L) continue;
       const done = c.completed[L.id];
       (done && new Date(done.date + 'T12:00:00') >= weekAgo ? recent : rest).push(...lessonQs(L));
@@ -219,6 +224,83 @@ Devuelve SOLO un array JSON. Cada elemento es {"type":"mc","s":"frase en ${L.tar
       ? {type:'fill', s:String(q.s||''), ans:(Array.isArray(q.ans)?q.ans:[q.ans]).map(String), e:String(q.e||''), band:q.band}
       : {type:'mc', s:String(q.s||''), o:(q.o||[]).map(String).slice(0,4), a:Math.max(0, Math.min(3, +q.a||0)), e:String(q.e||''), band:q.band})
     .filter(q => q.s.includes('___') && (q.type === 'fill' ? q.ans.length && q.ans[0] : q.o.length >= 2));
+}
+
+/* ---------- audio: escuchar y pronunciar ---------- */
+const TTS_LANG = {en:'en-GB', fr:'fr-FR', pt:'pt-BR', it:'it-IT', de:'de-DE'};
+const canSpeak = typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined';
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const curLang = () => TTS_LANG[(C() || {}).lang || 'en'] || 'en-GB';
+let ttsRate = 1;
+if (canSpeak) { try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices(); } catch(e) {} }
+function pickVoice(lang, idx){
+  let vs = []; try { vs = speechSynthesis.getVoices(); } catch(e) {}
+  const norm = v => v.lang.replace('_', '-');
+  const exact = vs.filter(v => norm(v) === lang), near = vs.filter(v => norm(v).slice(0, 2) === lang.slice(0, 2));
+  const pool = exact.length > idx ? exact : near.length ? near : exact;
+  return pool.length ? pool[idx % pool.length] : null;
+}
+function speak(text, o = {}){
+  if (!canSpeak) return null;
+  const lang = curLang(), u = new SpeechSynthesisUtterance(text);
+  u.lang = lang; u.rate = o.rate || ttsRate; if (o.pitch) u.pitch = o.pitch;
+  const v = pickVoice(lang, o.voice || 0); if (v) u.voice = v;
+  if (o.onend) u.onend = o.onend;
+  speechSynthesis.speak(u); return u;
+}
+function speakNow(text, o){ if (!canSpeak) return; speechSynthesis.cancel(); speak(text, o); }
+const sayBtn = (text, label = 'Escuchar') => canSpeak ? `<button class="say" type="button" data-say="${esc(text)}" aria-label="${label}" title="${label}">${ic('sound', 16)}</button>` : '';
+document.addEventListener('click', e => { const b = e.target.closest('[data-say]'); if (b) { e.preventDefault(); speakNow(b.dataset.say); } });
+const words = s => norm(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/\b(can)'t\b/g, 'cannot').replace(/won't/g, 'will not').replace(/n't\b/g, ' not').replace(/'m\b/g, ' am').replace(/'re\b/g, ' are')
+  .replace(/'ll\b/g, ' will').replace(/'ve\b/g, ' have').replace(/'d\b/g, ' would').replace(/\b(it|that|what|there|he|she)'s\b/g, '$1 is')
+  .replace(/[^a-z0-9' ]/g, ' ').split(/\s+/).filter(Boolean);
+function matchScore(target, heard){
+  const t = words(target), h = words(heard); if (!t.length) return 0;
+  const bag = {}; h.forEach(w => bag[w] = (bag[w] || 0) + 1);
+  let hit = 0; t.forEach(w => { if (bag[w]) { hit++; bag[w]--; } });
+  return hit / t.length;
+}
+function listenOnce(){
+  return new Promise((res, rej) => {
+    const r = new SR(); let done = false;
+    r.lang = curLang(); r.interimResults = false; r.maxAlternatives = 3;
+    r.onresult = e => { done = true; res([...e.results[0]].map(a => a.transcript)); };
+    r.onerror = e => { if (!done) { done = true; rej(e.error || 'error'); } };
+    r.onend = () => { if (!done) { done = true; rej('no-speech'); } };
+    try { r.start(); } catch(err) { rej('busy'); }
+  });
+}
+function speakingBlock(examples){
+  if (!SR || !examples || !examples.length) return '';
+  return `<section class="card stack"><div><span class="eyebrow">Pronunciación</span><h3>Repite en voz alta</h3><p class="muted">Escucha la frase, pulsa el micrófono y repítela. Te digo cuánto se entendió.</p></div>
+    <div class="list">${examples.map((e, i) => `<div class="li speak-row"><div class="t"><b>${esc(e[0])}</b><small>${esc(e[1])}</small><small class="speak-res" id="sr-${i}"></small></div>
+      <div class="row" style="gap:6px;flex-wrap:nowrap">${sayBtn(e[0])}<button class="mic" type="button" data-mic="${i}" aria-label="Grabar mi pronunciación" title="Grabar">${ic('mic', 18)}</button></div></div>`).join('')}</div></section>`;
+}
+function wireSpeaking(root, examples){
+  root.querySelectorAll('[data-mic]').forEach(b => b.onclick = async () => {
+    const i = +b.dataset.mic, out = $('#sr-' + i, root), target = examples[i][0];
+    if (canSpeak) speechSynthesis.cancel();
+    b.classList.add('rec'); out.className = 'speak-res'; out.textContent = 'Escuchando… habla ahora.';
+    try {
+      const alts = await listenOnce();
+      const best = alts.map(a => [a, matchScore(target, a)]).sort((x, y) => y[1] - x[1])[0];
+      const pct = Math.round(best[1] * 100);
+      out.className = 'speak-res ' + (pct >= 85 ? 'ok' : pct >= 60 ? 'mid' : 'no');
+      out.textContent = pct >= 85 ? `¡Excelente! Se entendió el ${pct}%.` : pct >= 60 ? `¡Casi! ${pct}%. Se entendió: "${best[0]}"` : `Se entendió: "${best[0]}". Escucha otra vez y repite más despacio.`;
+      logActivity(pct >= 85 ? 5 : 2); save(); renderSide();
+    } catch(err) {
+      out.className = 'speak-res no';
+      out.textContent = err === 'not-allowed' || err === 'service-not-allowed' ? 'Permite el uso del micrófono en tu navegador para practicar.' : err === 'no-speech' ? 'No te escuché. Pulsa el micrófono y habla cerca del dispositivo.' : 'No se pudo usar el micrófono. Prueba en Chrome o Edge.';
+    }
+    b.classList.remove('rec');
+  });
+}
+function playScript(script, onDone){
+  if (!canSpeak) return;
+  speechSynthesis.cancel();
+  const who = [...new Set(script.map(l => l[0]))];
+  script.forEach((l, i) => { const k = who.indexOf(l[0]); speak(l[1], {voice:k, pitch: k % 2 ? 0.85 : 1.1, onend: i === script.length - 1 ? onDone : null}); });
 }
 
 /* ---------- componentes ---------- */
@@ -299,6 +381,7 @@ function header(title, sub){
 
 function render(){
   const app = $('#app');
+  if (canSpeak) { try { speechSynthesis.cancel(); } catch(e) {} }
   if (!booted) { app.classList.add('solo'); $('#main').innerHTML = '<div class="onb"><div class="row"><span class="spinner"></span> Cargando…</div></div>'; return; }
   if (sb && !session) { app.classList.add('solo'); renderAuth(); return; }
   if (ui.auth && ui.auth.mode === 'newpass') { app.classList.add('solo'); renderAuth(); return; }
@@ -467,7 +550,7 @@ function vInicio(m){
     (canLevelUp(c) ? `<div class="banner"><div><b>¡Estás listo para subir a ${nextLevel(c.level)}!</b><div class="muted">Completaste todas las lecciones y aprobaste el examen con más del 70%.</div></div><button class="btn" id="lvup">Subir a ${nextLevel(c.level)}</button></div>` : '') +
     `<div class="grid"><div class="col">
       <section class="hero"><div><div class="label">${ic('book', 18)} Lección de hoy</div><h2>${esc(title)}</h2>
-        <div class="meta"><span>${ic('clock', 15)} ${L ? L.min : 12} min</span><span>${LANGS[c.lang].name} · Nivel ${c.level}</span>${ti >= 0 ? `<span>Lección ${ti + 1} de 4</span>` : ''}</div></div>
+        <div class="meta"><span>${ic('clock', 15)} ${L ? L.min : 12} min</span><span>${LANGS[c.lang].name} · Nivel ${c.level}</span>${ti >= 0 ? `<span>Lección ${ti + 1} de ${nLessons(c)}</span>` : ''}</div></div>
         <div class="hero-art">${BIG[icon]}</div>
         <div class="actions">${ti >= 0 ? `<button class="btn" id="go-lesson">Iniciar lección de hoy ${ic('arrow', 18)}</button>` : `<a class="btn" href="#examenes">Hacer el examen de nivel ${ic('arrow', 18)}</a>`}</div></section>
       <section class="card" id="practice"></section>
@@ -513,7 +596,7 @@ function planTimeline(c){
     const done = c.completed ? doneInLevel(c, lv) : 0;
     const items = topics(c.lang)[lv].map((t, k) => `<div class="li"><span class="num ${c.completed && c.completed[lid(c.lang, lv, k)] ? 'done' : ''}">${c.completed && c.completed[lid(c.lang, lv, k)] ? ic('check', 14) : k + 1}</span><div class="t"><b>${esc(t)}</b></div></div>`).join('');
     return `<div class="ms ${st} ${i === to ? 'goal' : ''}"><div class="ms-dot">${lv}</div><div class="card stack" style="padding:16px 18px">
-      <div class="row" style="justify-content:space-between"><div><h3>Hito ${i - from + 1}: Nivel ${lv} · ${LEVEL_NAMES[lv]}</h3><small class="muted">${st === 'done' ? 'Superado' : st === 'now' ? done + ' de 4 lecciones · examen de nivel ≥ 70%' : 'Unas 6 a 8 semanas a 15 min por día'}</small></div>
+      <div class="row" style="justify-content:space-between"><div><h3>Hito ${i - from + 1}: Nivel ${lv} · ${LEVEL_NAMES[lv]}</h3><small class="muted">${st === 'done' ? 'Superado' : st === 'now' ? done + ' de ' + topics(c.lang)[lv].length + ' lecciones · examen de nivel ≥ 70%' : 'Unas 4 a 6 semanas con práctica diaria'}</small></div>
       <span class="pill ${st === 'done' ? 'done' : st === 'now' ? 'now' : ''}">${st === 'done' ? 'Completado' : st === 'now' ? 'En curso' : i === to ? 'Tu meta' : 'Próximo'}</span></div>
       <div class="list">${items}</div>
       ${c.lang === 'en' && cert[lv] && i >= 3 ? `<div class="tip">${ic('trophy', 16)} Al cerrar este hito estarás en condiciones de presentarte al <b>${cert[lv]}</b>. Practica con los simulacros de Reading and Use of English.</div>` : ''}
@@ -522,7 +605,7 @@ function planTimeline(c){
 function vPlan(m){
   const c = C(), g = goalOf(c);
   m.innerHTML = header('Plan de estudio', `Objetivo: ${esc(g.label)} · de ${c.startLevel} a ${c.target}`) +
-    `<div class="card stack"><div class="row" style="justify-content:space-between"><div><h3>Cómo funciona tu plan</h3><p class="muted">Cada nivel es un hito con 4 lecciones clave y un examen. Al completar las lecciones y sacar 70% o más en el examen, subes de nivel.</p></div>
+    `<div class="card stack"><div class="row" style="justify-content:space-between"><div><h3>Cómo funciona tu plan</h3><p class="muted">Cada nivel es un hito con ${nLessons(c)} lecciones (gramática, vocabulario, lectura y escucha) y un examen. Al completar las lecciones y sacar 70% o más en el examen, subes de nivel.</p></div>
     <a class="btn ghost sm" href="#configuracion">Cambiar objetivo</a></div></div>` + planTimeline(c);
 }
 
@@ -536,7 +619,7 @@ function vLecciones(m){
     LEVELS.map((lv, li) => {
       if (li > cur + 1) return '';
       const locked = li > cur;
-      return `<section class="card"><div class="row" style="justify-content:space-between"><h3>Nivel ${lv} · ${LEVEL_NAMES[lv]}</h3><span class="pill ${li < cur ? 'done' : li === cur ? 'now' : ''}">${li < cur ? 'Superado' : li === cur ? doneInLevel(c, lv) + ' / 4' : 'Bloqueado'}</span></div>
+      return `<section class="card"><div class="row" style="justify-content:space-between"><h3>Nivel ${lv} · ${LEVEL_NAMES[lv]}</h3><span class="pill ${li < cur ? 'done' : li === cur ? 'now' : ''}">${li < cur ? 'Superado' : li === cur ? doneInLevel(c, lv) + ' / ' + nLessons(c, lv) : 'Bloqueado'}</span></div>
       <div class="list" style="margin-top:8px">${topics(c.lang)[lv].map((t, i) => { const done = c.completed[lid(c.lang, lv, i)]; const L = getLesson(c, lv, i);
         return `<div class="li"><span class="num ${done ? 'done' : ''}">${done ? ic('check', 14) : i + 1}</span><div class="t"><b>${esc(t)}</b><small>${done ? 'Completada · ' + done.score + '/' + done.total + ' aciertos' : L ? (L.min || 12) + ' min' : 'Se genera con IA'}</small></div>
         ${locked ? '' : `<button class="btn ${done ? 'ghost' : ''} sm" data-open="${lv}|${i}">${done ? 'Repasar' : 'Abrir'}</button>`}</div>`; }).join('')}</div></section>`;
@@ -563,7 +646,7 @@ function vLesson(m){
   const L = isExtra ? Object.assign({id}, c.generated[id]) : getLesson(c, lv, i);
   const topic = isExtra ? (L.title || '') : topics(c.lang)[lv][i];
   const back = `<button class="btn ghost sm" id="back">${ic('back', 16)} Lecciones</button>`;
-  if (!L || !L.sections) {
+  if (!L || !(L.sections || L.text || L.script)) {
     m.innerHTML = header(esc(topic), `Nivel ${lv} · ${LANGS[c.lang].name}`) + `<div class="card stack">${back}
       ${ai ? `<p>El profe prepara esta lección para ti en unos segundos.</p><div><button class="btn" id="gen">Preparar lección</button></div><p class="muted" id="gen-msg"></p>` : `<p>Esta lección se crea con IA y el generador no está disponible en esta vista. El curso de inglés incluye todas sus lecciones sin necesidad de IA.</p>`}</div>`;
     $('#back').onclick = () => { ui.lesson = null; render(); };
@@ -576,22 +659,40 @@ function vLesson(m){
     return;
   }
   const prev = c.completed[id];
-  m.innerHTML = header(esc(L.title || topic), `Lección de hoy · Nivel ${lv} · ${L.min || 12} min de lectura`) +
-    `<div class="row">${back}${prev ? '<span class="pill done">Ya completada</span>' : ''}${L.ai ? '<span class="pill">Creada con IA</span>' : ''}</div>
+  const isR = L.kind === 'reading', isL = L.kind === 'listening';
+  let core;
+  if (isR) core = `<div class="reading">${L.text.map(p => `<p>${esc(p)}</p>`).join('')}</div>${canSpeak ? `<div><button class="btn soft sm" type="button" data-say="${esc(L.text.join(' '))}">${ic('sound', 16)} Escuchar el texto</button></div>` : ''}`;
+  else if (isL) core = canSpeak ? `<div class="player"><div class="row"><button class="btn" id="pl-play" type="button">${ic('play', 16)} Escuchar el audio</button>
+      <button class="btn ghost sm" id="pl-rate" type="button">Velocidad: normal</button><button class="btn ghost sm" id="pl-tr" type="button">Ver transcripción</button></div>
+      <p class="muted" style="font-size:13.5px">Escúchalo una o dos veces antes de responder. La transcripción está para revisar al final.</p></div>
+      <div class="transcript" id="pl-text" hidden>${L.script.map(l => `<p><b>${esc(l[0])}:</b> ${esc(l[1])}</p>`).join('')}</div>`
+    : `<p class="tip">Tu navegador no puede reproducir audio. Aquí tienes la transcripción para practicar como lectura.</p><div class="transcript">${L.script.map(l => `<p><b>${esc(l[0])}:</b> ${esc(l[1])}</p>`).join('')}</div>`;
+  else core = `${L.sections.map(s => `<section><h3>${esc(s.h)}</h3><p>${esc(s.p)}</p></section>`).join('')}
+      ${L.examples && L.examples.length ? `<section><h3>Ejemplos</h3><div class="ex">${L.examples.map(e => `<div><span class="sayrow">${sayBtn(e[0])}<span>${esc(e[0])}</span></span></div><div>${esc(e[1])}</div>`).join('')}</div></section>` : ''}`;
+  m.innerHTML = header(esc(L.title || topic), `Nivel ${lv} · ${L.min || 12} min de ${isL ? 'escucha' : 'lectura'}`) +
+    `<div class="row">${back}${prev ? '<span class="pill done">Ya completada</span>' : ''}${isR ? '<span class="pill now">Lectura</span>' : isL ? '<span class="pill now">Escucha</span>' : ''}${L.ai ? '<span class="pill">Creada con IA</span>' : ''}</div>
     <article class="card"><div class="lesson-body">
       <p style="font-size:17px">${esc(L.intro)}</p>
-      ${L.sections.map(s => `<section><h3>${esc(s.h)}</h3><p>${esc(s.p)}</p></section>`).join('')}
-      ${L.examples && L.examples.length ? `<section><h3>Ejemplos</h3><div class="ex">${L.examples.map(e => `<div>${esc(e[0])}</div><div>${esc(e[1])}</div>`).join('')}</div></section>` : ''}
+      ${core}
       ${L.tip ? `<div class="tip"><b>Consejo del profe:</b> ${esc(L.tip)}</div>` : ''}
-      ${L.vocab && L.vocab.length ? `<section><h3>Vocabulario nuevo</h3><div class="vchips">${L.vocab.map(v => `<span><b>${esc(v[0])}</b> · ${esc(v[1])}</span>`).join('')}</div></section>` : ''}
+      ${L.vocab && L.vocab.length ? `<section><h3>Vocabulario nuevo</h3><div class="vchips">${L.vocab.map(v => `<span>${sayBtn(v[0])}<b>${esc(v[0])}</b> · ${esc(v[1])}</span>`).join('')}</div></section>` : ''}
     </div></article>
-    <section class="card stack"><div><span class="eyebrow">Práctica</span><h3>Pon a prueba lo que aprendiste</h3><p class="muted">Responde y te digo si es correcto, con la regla.</p></div><div id="lq" class="stack"></div>
+    ${!isR && !isL ? speakingBlock(L.examples) : ''}
+    <section class="card stack"><div><span class="eyebrow">Práctica</span><h3>${isR ? 'Comprueba si entendiste el texto' : isL ? 'Comprueba si entendiste el audio' : 'Pon a prueba lo que aprendiste'}</h3><p class="muted">Responde y te digo si es correcto, con la explicación.</p></div><div id="lq" class="stack"></div>
     <div class="row" style="justify-content:flex-end"><button class="btn" id="finish" disabled>Completar lección ${ic('check', 18)}</button></div></section>`;
+  if (!isR && !isL) wireSpeaking(m, L.examples || []);
+  if (isL && canSpeak) {
+    const pb = $('#pl-play'), rb = $('#pl-rate'), tb = $('#pl-tr'); let playing = false;
+    const idle = () => { playing = false; pb.innerHTML = `${ic('play', 16)} Escuchar otra vez`; };
+    pb.onclick = () => { if (playing) { speechSynthesis.cancel(); idle(); return; } playing = true; pb.innerHTML = `${ic('stop', 16)} Detener`; playScript(L.script, idle); };
+    rb.onclick = () => { ttsRate = ttsRate === 1 ? 0.75 : 1; rb.textContent = 'Velocidad: ' + (ttsRate === 1 ? 'normal' : 'lenta'); };
+    tb.onclick = () => { const t = $('#pl-text'); t.hidden = !t.hidden; tb.textContent = t.hidden ? 'Ver transcripción' : 'Ocultar transcripción'; };
+  }
   $('#back').onclick = () => { ui.lesson = null; render(); };
-  const qs = lessonQs(L); let answered = 0, right = 0;
+  const qs = lessonQs(L, true); let answered = 0, right = 0;
   qs.forEach((q, k) => {
     const w = document.createElement('div'); if (k) w.style.cssText = 'border-top:1px solid var(--line);padding-top:16px';
-    w.appendChild(questionEl(q, {eyebrow:`Ejercicio ${k + 1} de ${qs.length}`, onDone: ok => { answered++; if (ok) right++; renderSide(); if (answered === qs.length) $('#finish').disabled = false; }}));
+    w.appendChild(questionEl(q, {eyebrow:`Ejercicio ${k + 1} de ${qs.length}`, title: q.ctx ? (isL ? 'Responde según el audio' : 'Responde según el texto') : null, onDone: ok => { answered++; if (ok) right++; renderSide(); if (answered === qs.length) $('#finish').disabled = false; }}));
     $('#lq').appendChild(w);
   });
   $('#finish').onclick = () => {
@@ -654,7 +755,7 @@ function vExam(m){
     m.innerHTML = header(esc(x.title), 'Resultados') +
       `<section class="card stack"><div class="row" style="justify-content:space-between"><div><div class="score">${pct}%</div><p class="muted">${right} de ${x.qs.length} correctas · +${right * 5} XP</p></div>
       <div style="max-width:42ch"><b>${pct >= 90 ? '¡Excelente trabajo!' : pct >= 70 ? '¡Aprobado! Vas muy bien.' : pct >= 50 ? 'Buen intento. Repasa los errores y vuelve a intentarlo.' : 'No pasa nada: cada error es una lección. Revisa las explicaciones.'}</b>
-      <p class="muted">${pct >= 70 && c.level !== 'C2' ? (doneInLevel(c) === 4 ? 'Ya puedes subir de nivel desde Inicio.' : 'Completa las lecciones del nivel para poder subir.') : 'Necesitas 70% para avanzar de nivel.'}</p></div></div>
+      <p class="muted">${pct >= 70 && c.level !== 'C2' ? (doneInLevel(c) === nLessons(c) ? 'Ya puedes subir de nivel desde Inicio.' : 'Completa las lecciones del nivel para poder subir.') : 'Necesitas 70% para avanzar de nivel.'}</p></div></div>
       <div class="row"><button class="btn" id="ex-close">Volver a exámenes</button><a class="btn ghost" href="#inicio">Ir a inicio</a></div></section>
       <section class="card review"><h3>Revisión</h3><div class="list" style="margin-top:6px">${x.qs.map((q, i) => { const ok = isRight(q, x.answers[i]); const given = q.type === 'mc' ? (x.answers[i] != null ? q.o[x.answers[i]] : '—') : (x.answers[i] || '—');
         return `<div class="li"><span class="fb-ico ${ok ? 'ok' : 'no'}">${ic(ok ? 'check' : 'x', 14)}</span><div class="t">${q.first ? `<small>${esc(q.first)} · <b>${esc(q.key)}</b></small>` : ''}<b>${sentenceHTML(q.s)}${q.stem ? ' (' + esc(q.stem) + ')' : ''}</b><small>Tu respuesta: ${esc(given)}${ok ? '' : ' · Correcta: ' + esc(rightText(q))}</small><small style="display:block">${esc(q.e || '')}</small></div></div>`; }).join('')}</div></section>`;
@@ -685,7 +786,7 @@ function vVocab(m){
   m.innerHTML = header('Vocabulario', `${c.vocab.length} palabras · ${c.vocab.filter(v => v.known).length} dominadas`) +
     (c.vocab.length ? `<section class="card stack" id="flash-card"></section>` : '') +
     `<section class="card stack"><div class="row" style="justify-content:space-between"><h3>Tu lista</h3><input id="vf" class="" style="padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);min-width:0;flex:0 1 240px" placeholder="Buscar palabra" value="${esc(f)}"></div>
-    ${c.vocab.length ? `<div class="tablewrap"><table><thead><tr><th>Palabra</th><th>Significado</th><th>Lección</th><th>Estado</th></tr></thead><tbody>${words.map(v => `<tr><td><b>${esc(v.w)}</b></td><td>${esc(v.t)}</td><td class="muted">${esc(v.from)}</td><td><span class="pill ${v.known ? 'done' : ''}">${v.known ? 'Dominada' : 'Repasar'}</span></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Las palabras nuevas de cada lección que completes se guardan aquí para repasarlas con tarjetas.</p>'}</section>`;
+    ${c.vocab.length ? `<div class="tablewrap"><table><thead><tr><th>Palabra</th><th>Significado</th><th>Lección</th><th>Estado</th></tr></thead><tbody>${words.map(v => `<tr><td><span class="sayrow">${sayBtn(v.w)}<b>${esc(v.w)}</b></span></td><td>${esc(v.t)}</td><td class="muted">${esc(v.from)}</td><td><span class="pill ${v.known ? 'done' : ''}">${v.known ? 'Dominada' : 'Repasar'}</span></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Las palabras nuevas de cada lección que completes se guardan aquí para repasarlas con tarjetas.</p>'}</section>`;
   const vf = $('#vf'); vf.oninput = () => { ui.vf = vf.value; const pos = vf.selectionStart; vVocab(m); const n = $('#vf'); n.focus(); n.setSelectionRange(pos, pos); };
   if (c.vocab.length) renderFlash($('#flash-card'));
 }
@@ -695,7 +796,7 @@ function renderFlash(box){
   ui.flash = ui.flash || {i:0, show:false};
   const v = deck[ui.flash.i % deck.length];
   box.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Tarjetas de repaso</h3><span class="pill">${pend.length} por repasar</span></div>
-    <div class="flash"><b>${esc(v.w)}</b>${ui.flash.show ? `<span style="font-size:18px">${esc(v.t)}</span><small class="muted">De: ${esc(v.from)}</small>` : '<span class="muted">¿Recuerdas qué significa?</span>'}</div>
+    <div class="flash"><div class="row" style="justify-content:center"><b>${esc(v.w)}</b>${sayBtn(v.w)}</div>${ui.flash.show ? `<span style="font-size:18px">${esc(v.t)}</span><small class="muted">De: ${esc(v.from)}</small>` : '<span class="muted">¿Recuerdas qué significa?</span>'}</div>
     <div class="row" style="justify-content:center">${ui.flash.show ? `<button class="btn ghost" id="fl-no">Repasar otra vez</button><button class="btn" id="fl-yes">${ic('check', 18)} La sabía</button>` : `<button class="btn" id="fl-show">Mostrar significado</button>`}</div>`;
   const s = $('#fl-show', box); if (s) s.onclick = () => { ui.flash.show = true; renderFlash(box); };
   const y = $('#fl-yes', box); if (y) y.onclick = () => { v.known = true; logActivity(3); save(); ui.flash = {i: ui.flash.i, show:false}; vVocab($('#main')); renderSide(); };
