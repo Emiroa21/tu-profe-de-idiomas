@@ -29,6 +29,7 @@ const P = {
   trend:'<path d="m3 17 6-6 4 4 8-8M15 7h6v6"/>',
   spark:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>',
   mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  logout:'<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/>',
   trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>'
 };
 const ic = (n, s=20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]||P.book}</svg>`;
@@ -275,10 +276,13 @@ window.addEventListener('hashchange', () => { if (ui.keep) ui.keep = false; else
 
 function renderSide(){
   const c = C(), r = route();
-  $('#side').innerHTML = `<div class="brand">${MARK(34)}Tu profe</div>
+  const out = sb && session ? `${ic('logout', 18)} Cerrar sesión` : '';
+  $('#side').innerHTML = `<div class="side-top"><div class="brand">${MARK(34)}Tu profe</div>${out ? `<button class="logout logout-m" data-logout>${out}</button>` : ''}</div>
     <nav class="nav">${VIEWS.map(([id, label, icon]) => `<a href="#${id}" class="${r === id ? 'on' : ''}">${ic(icon)}<span>${label}</span></a>`).join('')}</nav>
     <div class="levelbox"><small>Tu nivel</small><b>${LANGS[c.lang].name} - ${c.level}</b><div class="bar"><i style="width:${levelPct(c)}%"></i></div>
-    <small>${c.level === 'C2' ? levelPct(c) + '% de maestría C2' : levelPct(c) + '% para llegar a ' + nextLevel(c.level)}</small></div>`;
+    <small>${c.level === 'C2' ? levelPct(c) + '% de maestría C2' : levelPct(c) + '% para llegar a ' + nextLevel(c.level)}</small></div>
+    ${out ? `<button class="logout" data-logout>${out}</button>` : ''}`;
+  $('#side').querySelectorAll('[data-logout]').forEach(b => b.onclick = logout);
 }
 function header(title, sub){
   const c = C(), d = new Date();
