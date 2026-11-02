@@ -268,8 +268,25 @@ function listenOnce(){
     r.onresult = e => { done = true; res([...e.results[0]].map(a => a.transcript)); };
     r.onerror = e => { if (!done) { done = true; rej(e.error || 'error'); } };
     r.onend = () => { if (!done) { done = true; rej('no-speech'); } };
-    try { r.start(); } catch(err) { rej('busy'); }
+    try { r.start(); } catch(err) { done = true; rej('start:' + (err && err.name || 'error')); }
   });
+}
+function micError(err){
+  const m = {
+    'not-allowed': 'El navegador bloqueó el micrófono. Pulsa el candado junto a la dirección, permite "Micrófono" y recarga la página.',
+    'service-not-allowed': 'Tu navegador no permite el reconocimiento de voz en esta página. Prueba en Google Chrome o Microsoft Edge.',
+    'no-speech': 'No te escuché. Pulsa el micrófono y habla cerca del dispositivo.',
+    'audio-capture': 'No se encontró ningún micrófono. Revisa que esté conectado y que el sistema le dé permiso al navegador.',
+    'network': 'El dictado de tu navegador necesita conectarse a su servicio de voz y no pudo. Pasa en Brave, Opera, Vivaldi y algunos Chromium. Prueba en Google Chrome o Edge.',
+    'language-not-supported': 'Tu navegador no reconoce voz en este idioma. Prueba en Google Chrome o Edge.',
+    'aborted': 'La grabación se interrumpió. Vuelve a pulsar el micrófono.'
+  };
+  return (m[err] || 'No se pudo usar el micrófono. Prueba en Google Chrome o Edge.') + ' (código: ' + err + ')';
+}
+async function micPermission(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  const s = await navigator.mediaDevices.getUserMedia({audio:true});
+  s.getTracks().forEach(t => t.stop());
 }
 function speakingBlock(examples){
   if (!SR || !examples || !examples.length) return '';
@@ -283,6 +300,7 @@ function wireSpeaking(root, examples){
     if (canSpeak) speechSynthesis.cancel();
     b.classList.add('rec'); out.className = 'speak-res'; out.textContent = 'Escuchando… habla ahora.';
     try {
+      try { await micPermission(); } catch(pe) { throw (pe && (pe.name === 'NotAllowedError' || pe.name === 'SecurityError')) ? 'not-allowed' : pe && pe.name === 'NotFoundError' ? 'audio-capture' : 'mic:' + (pe && pe.name); }
       const alts = await listenOnce();
       const best = alts.map(a => [a, matchScore(target, a)]).sort((x, y) => y[1] - x[1])[0];
       const pct = Math.round(best[1] * 100);
@@ -291,7 +309,7 @@ function wireSpeaking(root, examples){
       logActivity(pct >= 85 ? 5 : 2); save(); renderSide();
     } catch(err) {
       out.className = 'speak-res no';
-      out.textContent = err === 'not-allowed' || err === 'service-not-allowed' ? 'Permite el uso del micrófono en tu navegador para practicar.' : err === 'no-speech' ? 'No te escuché. Pulsa el micrófono y habla cerca del dispositivo.' : 'No se pudo usar el micrófono. Prueba en Chrome o Edge.';
+      out.textContent = micError(err);
     }
     b.classList.remove('rec');
   });
