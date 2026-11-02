@@ -32,6 +32,7 @@ const P = {
   trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>'
 };
 const ic = (n, s=20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]||P.book}</svg>`;
+const MARK = (s=34) => `<svg class="logo-mark" width="${s}" height="${s}" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#D9562B"/><path fill="#FFF" d="M20 14h24a10 10 0 0 1 10 10v11a10 10 0 0 1-10 10H31l-9.5 7.5V45H20a10 10 0 0 1-10-10V24a10 10 0 0 1 10-10z"/><path fill="#D9562B" d="M32 19.5 45 25.5 32 31.5 19 25.5z"/><path fill="#D9562B" d="M24.5 28.6V34c0 2.2 3.4 4 7.5 4s7.5-1.8 7.5-4v-5.4L32 32z"/><path fill="none" stroke="#D9562B" stroke-width="1.8" stroke-linecap="round" d="M45 25.5v7"/><circle cx="45" cy="34" r="1.9" fill="#D9562B"/></svg>`;
 const BIG = {
   mail:'<svg width="74" height="74" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" fill="currentColor" fill-opacity=".18"/><path d="m3 7 9 6.5L21 7"/></svg>',
   book:'<svg width="74" height="74" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v16a2 2 0 0 0-2-2H3zM21 5a2 2 0 0 0-2-2h-5a2 2 0 0 0-2 2v16a2 2 0 0 1 2-2h7z" fill="currentColor" fill-opacity=".18"/></svg>'
@@ -274,7 +275,7 @@ window.addEventListener('hashchange', () => { if (ui.keep) ui.keep = false; else
 
 function renderSide(){
   const c = C(), r = route();
-  $('#side').innerHTML = `<div class="brand"><span class="brand-mark">${ic('spark', 20)}</span>Tu profe</div>
+  $('#side').innerHTML = `<div class="brand">${MARK(34)}Tu profe</div>
     <nav class="nav">${VIEWS.map(([id, label, icon]) => `<a href="#${id}" class="${r === id ? 'on' : ''}">${ic(icon)}<span>${label}</span></a>`).join('')}</nav>
     <div class="levelbox"><small>Tu nivel</small><b>${LANGS[c.lang].name} - ${c.level}</b><div class="bar"><i style="width:${levelPct(c)}%"></i></div>
     <small>${c.level === 'C2' ? levelPct(c) + '% de maestría C2' : levelPct(c) + '% para llegar a ' + nextLevel(c.level)}</small></div>`;
@@ -322,7 +323,7 @@ function renderAuth(){
   const intro = {login:'Entra para seguir con tu plan, tus lecciones y tu racha.', signup:'Tu progreso quedará guardado en tu cuenta y podrás seguir desde cualquier dispositivo.', reset:'Te enviaremos un enlace a tu correo para elegir una contraseña nueva.', newpass:'Escribe la contraseña que quieres usar a partir de ahora.'};
   const showEmail = a.mode !== 'newpass', showPass = a.mode === 'login' || a.mode === 'signup' || a.mode === 'newpass';
   m.innerHTML = `<div class="onb" style="max-width:460px">
-    <div class="brand" style="padding:0"><span class="brand-mark">${ic('spark', 20)}</span>Tu profe de idiomas</div>
+    <div class="brand" style="padding:0">${MARK(34)}Tu profe de idiomas</div>
     <div class="card stack"><div><h2>${titles[a.mode]}</h2><p class="muted" style="margin-top:4px">${intro[a.mode]}</p></div>
     <form id="auth-form" class="stack" novalidate>
       ${a.mode === 'signup' ? `<div class="field"><label for="au-name">Tu nombre</label><input id="au-name" autocomplete="name" placeholder="¿Cómo te llamas?"></div>` : ''}
@@ -368,7 +369,7 @@ function renderAuth(){
 function renderOnboarding(){
   const m = $('#main'), o = ui.onb;
   const steps = `<div class="steps">${[0,1,2,3].map(i => `<i class="${i <= Math.min(o.step, 3) ? 'on' : ''}"></i>`).join('')}</div>`;
-  const prof = `<span class="avatar" style="width:46px;height:46px">${ic('spark', 22)}</span>`;
+  const prof = MARK(46);
   let h = '';
   if (o.step === 0) {
     h = `<div class="hello">${prof}<div class="speech stack"><h2>¡Hola! Soy tu profe de idiomas</h2>
